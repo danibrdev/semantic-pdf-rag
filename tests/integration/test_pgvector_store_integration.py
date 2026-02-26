@@ -41,13 +41,15 @@ def test_integration_pgvector_save_and_search(vector_store):
         id=uuid.uuid4(),
         document_name="doc1.pdf",
         content="Apple is a tech company.",
-        embedding=[0.9, 0.1, 0.0] * (emb_dim // 3)
+        embedding=[0.9, 0.1, 0.0] * (emb_dim // 3),
+        metadata={"category": "tech", "author": "Steve"}
     )
     chunk_2 = DocumentChunk(
         id=uuid.uuid4(),
         document_name="doc2.pdf",
         content="Bananas are a great fruit.",
-        embedding=[0.0, 0.9, 0.1] * (emb_dim // 3)
+        embedding=[0.0, 0.9, 0.1] * (emb_dim // 3),
+        metadata={"category": "food", "author": "Dani"}
     )
     
     # 2. Save
@@ -61,3 +63,4 @@ def test_integration_pgvector_save_and_search(vector_store):
     assert len(results) == 1
     assert results[0].id == chunk_1.id
     assert results[0].content == chunk_1.content
+    assert results[0].metadata == {"category": "tech", "author": "Steve"}

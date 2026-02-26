@@ -63,8 +63,8 @@ def test_pgvector_store_similarity_search(mock_register_vector, mock_psycopg2):
     mock_id_1 = uuid.uuid4()
     mock_id_2 = uuid.uuid4()
     mock_cursor.fetchall.return_value = [
-        (mock_id_1, "doc-a.pdf", "Result 1", [0.1, 0.2, 0.3]),
-        (mock_id_2, "doc-b.pdf", "Result 2", [0.4, 0.5, 0.6]),
+        (mock_id_1, "doc-a.pdf", "Result 1", [0.1, 0.2, 0.3], {"author": "Dani"}),
+        (mock_id_2, "doc-b.pdf", "Result 2", [0.4, 0.5, 0.6], {"author": "Steve"}),
     ]
 
     # cursor context manager
@@ -81,8 +81,10 @@ def test_pgvector_store_similarity_search(mock_register_vector, mock_psycopg2):
     assert results[0].document_name == "doc-a.pdf"
     assert results[0].content == "Result 1"
     assert results[0].embedding == [0.1, 0.2, 0.3]
+    assert results[0].metadata == {"author": "Dani"}
 
     assert results[1].id == mock_id_2
     assert results[1].document_name == "doc-b.pdf"
     assert results[1].content == "Result 2"
     assert results[1].embedding == [0.4, 0.5, 0.6]
+    assert results[1].metadata == {"author": "Steve"}

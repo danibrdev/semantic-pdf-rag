@@ -41,7 +41,8 @@ class PgVectorStore(VectorStorePort):
                     id UUID PRIMARY KEY,
                     document_name TEXT NOT NULL,
                     content TEXT NOT NULL,
-                    embedding vector({self.settings.embedding_dimension})
+                    embedding vector({self.settings.embedding_dimension}),
+                    metadata JSONB DEFAULT '{{}}'::jsonb
                 );
                 """
             )
@@ -61,14 +62,15 @@ class PgVectorStore(VectorStorePort):
         """
         Persists a document chunk.
         """
+        import json
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO documents (id, document_name, content, embedding)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO documents (id, document_name, content, embedding, metadata)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING;
                 """,
-                (str(chunk.id), chunk.document_name, chunk.content, chunk.embedding),
+                (str(chunk.id), chunk.document_name, chunk.content, chunk.embedding, json.dumps(chunk.metadata)),
             )
             self.conn.commit()
 
@@ -83,7 +85,7 @@ class PgVectorStore(VectorStorePort):
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, document_name, content, embedding
+                SELECT id, document_name, content, embedding, metadata
                 FROM documents
                 ORDER BY embedding <-> %s::vector
                 LIMIT %s;
@@ -100,6 +102,7 @@ class PgVectorStore(VectorStorePort):
                 document_name=row[1],
                 content=row[2],
                 embedding=row[3],
+                metadata=row[4] if row[4] else {}
             )
             for row in rows
         ]

@@ -77,6 +77,7 @@ class IngestPDFUseCase:
                 document_name=document_name,
                 content=chunk_text,
                 embedding=vector,
+                metadata={"source": document_name, "type": "pdf_ingestion"}
             )
 
             self.vector_store.save(chunk)
