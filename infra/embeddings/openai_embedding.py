@@ -14,3 +14,10 @@ class OpenAIEmbedding(EmbeddingPort):
             input=text
         )
         return response.data[0].embedding
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        response = self.client.embeddings.create(
+            model=self.model,
+            input=texts
+        )
+        return [data.embedding for data in response.data]

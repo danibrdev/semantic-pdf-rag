@@ -60,11 +60,18 @@ class IngestPDFUseCase:
 
         document_name = Path(path).name
 
-        for idx, chunk_text in enumerate(chunks):
-            logger.debug("Gerando embedding do chunk %d", idx + 1)
+        if not chunks:
+            logger.warning("Nenhum texto extraído do PDF.")
+            return
 
-            vector = self.embedding.embed(chunk_text)
+        logger.info("Gerando embeddings em lote para %d chunks", len(chunks))
+        
+        # Call batch embedding
+        vectors = self.embedding.embed_batch(chunks)
 
+        logger.info("Salvando chunks no banco vetorial...")
+        
+        for chunk_text, vector in zip(chunks, vectors):
             chunk = DocumentChunk(
                 id=uuid4(),
                 document_name=document_name,

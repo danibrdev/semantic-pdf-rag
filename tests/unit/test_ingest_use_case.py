@@ -13,6 +13,9 @@ class FakeEmbedding(EmbeddingPort):
     def embed(self, text: str):
         return [0.1] * 10  # embedding fake
 
+    def embed_batch(self, texts: list[str]):
+        return [[0.1] * 10 for _ in texts]  # batch fake
+
 
 class FakeVectorStore(VectorStorePort):
     def __init__(self):

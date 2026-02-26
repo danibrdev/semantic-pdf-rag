@@ -14,3 +14,11 @@ class GeminiEmbedding(EmbeddingPort):
             content=text
         )
         return response["embedding"]
+
+    def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        response = genai.embed_content(
+            model=self.model,
+            content=texts
+        )
+        # When sending a list of texts, genai returns a dictionary where "embedding" is a list of lists.
+        return response["embedding"]
