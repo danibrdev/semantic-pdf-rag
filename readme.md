@@ -1,139 +1,94 @@
-Overview
+# Semantic PDF RAG CLI
 
-Semantic PDF RAG CLI is a clean-architecture Python application designed to:
-	•	Ingest PDF documents
-	•	Chunk and embed content
-	•	Store vectors in PostgreSQL + pgVector
-	•	Perform semantic search
-	•	Execute Retrieval-Augmented Generation (RAG)
-	•	Apply structured Prompt Engineering
-	•	Enforce Token Optimization and Budget Control
-	•	Operate in a provider-agnostic manner (OpenAI / Gemini)
+> Aplicativo CLI em Python com Clean Architecture para Geração Aumentada de Recuperação (RAG) de documentos PDF, focado em alta performance e conscientização de custos (tokens).
 
-This project was built as a professional-grade portfolio system, following modern AI architecture practices.
+O **Semantic PDF RAG CLI** foi construído como um sistema de nível profissional para portfólio, demonstrando práticas modernas de arquitetura de IA, governança explícita de tokens e separação de responsabilidades.
 
-Key Architectural Principles
-	•	Clean Architecture
-	•	Ports & Adapters
-	•	Provider-agnostic LLM integration
-	•	Token Optimization Strategy Layer
-	•	Explicit Token Budget Estimation
-	•	Structured Prompt Layer
-	•	Testable and extensible design
-	•	CLI-first workflow
+---
 
-Architecture
+## Principais Princípios Arquiteturais
 
-app/
-    use_cases/
-    prompting/
-    token_optimization/
-    services/
+- **Arquitetura Limpa & Ports/Adapters**: Lógica de domínio (Core) isolada da infraestrutura (bancos de dados, provedores LLM).
+- **Design Agnóstico de Provedor**: Facilidade para alternar entre OpenAI, Gemini ou modelos locais.
+- **Governança Explícita de Tokens**: Inclui uma Camada de Estratégia de Otimização de Tokens para aplicar controle de orçamento e limpeza de contexto antes de qualquer chamada ao LLM.
+- **Focado em CLI**: Projetado para processamento de alta velocidade baseado no terminal.
+- **Pronto para Produção**: Testável, extensível, e estruturado com tipagem (Type Hints) e logs claros.
 
-core/
-    ports/
+---
 
-domain/
-    entities/
-    value_objects/
+## Estrutura do Projeto
 
-infrastructure/
-    database/
-    vector_store/
-    embeddings/
-    llm/
+O projeto segue uma regra de Dependência, onde as dependências apontam apenas para dentro, em direção à camada de domínio (`domain`):
 
-RAG Flow 
-User Query
-   ↓
-Embedding
-   ↓
-Vector Search (pgVector + HNSW)
-   ↓
-Token Optimization Layer
-   - dynamic top_k
-   - similarity threshold
-   - context compression
-   - history control
-   - token budget enforcement
-   ↓
-Prompt Architecture Layer
-   - structured prompt sections
-   - guardrails
-   - minimal verbosity
-   ↓
-LLM (provider-agnostic)
-   ↓
-Response
+```text
+semantic-pdf-rag/
+├── cli/                 # Camada de apresentação CLI baseada no Typer
+├── core/                # Orquestração RAG e Casos de Uso (Otimização de tokens, Prompts)
+├── domain/              # Lógica de negócio pura (Entidades, Ports/Interfaces, Objetos de Valor)
+├── infra/               # Adaptadores de infraestrutura (PostgreSQL, pgVector, LLMs, Leitores PDF)
+└── tests/               # Testes Unitários e de Integração
+```
 
-Token Governance
+---
 
-This system includes an explicit Token Optimization Strategy Layer responsible for:
-	•	Context pruning
-	•	Dynamic top-k retrieval
-	•	Redundancy removal
-	•	Context compression
-	•	Sliding window history
-	•	Prompt minimalism
+## Fluxo de Execução (RAG Flow)
 
-Token Budget Estimation
+```mermaid
+flowchart TD
+    Q[Pergunta do Usuário] --> E[Provedor de Embeddings]
+    E --> VS[(pgVector + HNSW)]
+    VS --> R[Recuperar Top-K Chunks]
+    R --> TO[Camada de Otimização de Tokens]
+    TO --> TB[Estimador de Orçamento de Tokens]
+    TB --> PB[Construtor de Prompts]
+    PB --> LLM[LLM Agnóstico]
+    LLM --> A[Resposta Final]
+```
 
-Before every LLM call:
-	•	Token usage is estimated
-	•	Maximum budget is enforced
-	•	Context is dynamically reduced if necessary
-	•	Reserved response tokens are guaranteed
+### Governança e Estratégia de Tokens
+Antes de cada chamada ao LLM, o sistema garante eficiência de tokens através de:
+1. Ajuste dinâmico de recuperação (Top-K) e filtragem por limite de similaridade.
+2. Compressão da janela de contexto e remoção de redundância.
+3. Reserva de tokens para a saída e aplicação rígida de limites máximos (Context window limits).
 
-This ensures:
-	•	Predictable cost
-	•	Reduced latency
-	•	Production readiness
+---
 
-⸻
+## Stack Tecnológico
 
-Prompt Architecture
-Prompt structure is explicitly layered:
-[ SYSTEM ]
-[ INSTRUCTION ]
-[ CONTEXT ]
-[ USER QUERY ]
+- **Linguagem**: Python 3.11+
+- **Banco de Dados**: PostgreSQL com `pgVector`
+- **Indexação**: Índice HNSW para busca de similaridade de cossenos
+- **CLI**: Typer
+- **Validação**: Pydantic
+- **Testes**: Pytest
+- **Infraestrutura**: Docker & Docker Compose
 
-Techniques applied:
-	•	Structured prompting
-	•	Instruction anchoring
-	•	Context isolation
-	•	Anti-hallucination guidance
-	•	Minimal verbosity control
-	•	Optional ReAct-style reasoning
+---
 
-Tech Stack
-	•	Python 3.11+
-	•	PostgreSQL
-	•	pgVector
-	•	HNSW index
-	•	LangChain (optional abstraction)
-	•	Pydantic (configuration + models)
-	•	pytest
-	•	Docker
-	•	OpenAI or Gemini embeddings
-	•	Provider-agnostic LLM interface
+## Guia de Início Rápido (Planejado)
 
-CLI Commands (Planned)
-semantic-rag ingest path/to/file.pdf
+```bash
+# Inserir um documento PDF no banco de vetores
+semantic-rag ingest caminho/para/o/arquivo.pdf
+
+# Iniciar uma sessão de chat usando os documentos indexados
 semantic-rag chat
-semantic-rag reindex
+
+# Visualizar estatísticas de indexação
 semantic-rag stats
+```
 
-Differentiators
-	•	Explicit token governance
-	•	Clean architecture with ports
-	•	Production-like design
-	•	Cost-aware RAG
-	•	Extensible strategy layers
-	•	Enterprise-ready structure
+---
 
-Project Goals
-	•	Demonstrate applied AI architecture knowledge
-	•	Showcase scalable RAG design
-	•	Exhibit cost-awareness and token control
-	•	Build a portfolio-ready AI engineering system
+## Objetivos do Projeto
+
+- **Demonstrar conhecimento aplicado em arquitetura de IA** utilizando padrões de Arquitetura Limpa em um contexto de LLMs.
+- **Apresentar um design escalável para RAG** usando PostgreSQL e pgVector para recuperação a nível empresarial.
+- **Exibir conscientização de custos** através de rigoroso controle de tokens e isolamento de orçamentos.
+- **Fornecer um sistema pronto para portfólio** expondo práticas robustas de engenharia de software corporativa.
+
+---
+
+## 📝 Licença
+
+Este projeto está sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
