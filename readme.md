@@ -2,15 +2,22 @@
 
 > Aplicativo CLI em Python com Clean Architecture para Geração Aumentada de Recuperação (RAG) de documentos PDF, focado em alta performance e conscientização de custos (tokens).
 
-O **Semantic PDF RAG CLI** foi construído como um sistema de nível profissional para portfólio, demonstrando práticas modernas de arquitetura de IA, governança explícita de tokens e separação de responsabilidades.
+O **Semantic PDF RAG CLI** foi construído como um sistema de nível profissional para portfólio, demonstrando práticas modernas de arquitetura de IA e desenvolvimento Python.
+
+---
+
+## O Desafio
+
+O projeto foi criado para cumprir o seguinte requisito técnico:
+> *"Desenvolver um software em Python capaz de ler um PDF, armazenar os dados vetorizados em um banco PostgreSQL com pgVector e permitir buscas semânticas por meio de um chat via terminal (CLI) utilizando LangChain, embeddings e modelos LLM (OpenAI ou Gemini)."*
 
 ---
 
 ## Principais Princípios Arquiteturais
 
-- **Arquitetura Limpa & Ports/Adapters**: Lógica de domínio (Core) isolada da infraestrutura (bancos de dados, provedores LLM).
-- **Design Agnóstico de Provedor**: Facilidade para alternar entre OpenAI, Gemini ou modelos locais.
-- **Governança Explícita de Tokens**: Inclui uma Camada de Estratégia de Otimização de Tokens para aplicar controle de orçamento e limpeza de contexto antes de qualquer chamada ao LLM.
+- **Arquitetura Limpa & Ports/Adapters**: Lógica de domínio (Core) isolada da infraestrutura.
+- **Integração com LangChain**: Utilização profunda do ecossistema LangChain para orquestração de RAG, modelos de embeddings e comunicação com LLMs.
+- **Governança Explícita de Tokens**: Inclui uma Camada de Estratégia de Otimização de Tokens para aplicar controle de orçamento de contexto.
 - **Focado em CLI**: Projetado para processamento de alta velocidade baseado no terminal.
 - **Pronto para Produção**: Testável, extensível, e estruturado com tipagem (Type Hints) e logs claros.
 
@@ -18,14 +25,14 @@ O **Semantic PDF RAG CLI** foi construído como um sistema de nível profissiona
 
 ## Estrutura do Projeto
 
-O projeto segue uma regra de Dependência, onde as dependências apontam apenas para dentro, em direção à camada de domínio (`domain`):
+O projeto segue uma regra de Dependência Adaptada, focando em manutenibilidade e escalabilidade:
 
 ```text
 semantic-pdf-rag/
 ├── cli/                 # Camada de apresentação CLI baseada no Typer
-├── core/                # Orquestração RAG e Casos de Uso (Otimização de tokens, Prompts)
-├── domain/              # Lógica de negócio pura (Entidades, Ports/Interfaces, Objetos de Valor)
-├── infra/               # Adaptadores de infraestrutura (PostgreSQL, pgVector, LLMs, Leitores PDF)
+├── core/                # Orquestração RAG usando LangChain e Casos de Uso
+├── domain/              # Lógica de negócio pura (Entidades, Interfaces)
+├── infra/               # Implementações de armazenamento e integrações de LLM
 └── tests/               # Testes Unitários e de Integração
 ```
 
@@ -35,14 +42,14 @@ semantic-pdf-rag/
 
 ```mermaid
 flowchart TD
-    Q[Pergunta do Usuário] --> E[Provedor de Embeddings]
-    E --> VS[(pgVector + HNSW)]
+    Q[Pergunta do Usuário] --> LC[LangChain Orchestrator]
+    LC --> E[Provedor de Embeddings LangChain]
+    E --> VS[(pgVector + HNSW via LangChain)]
     VS --> R[Recuperar Top-K Chunks]
     R --> TO[Camada de Otimização de Tokens]
-    TO --> TB[Estimador de Orçamento de Tokens]
-    TB --> PB[Construtor de Prompts]
-    PB --> LLM[LLM Agnóstico]
-    LLM --> A[Resposta Final]
+    TO --> PB[LangChain Prompt Template]
+    PB --> LLM[LLM OpenAI/Gemini via LangChain]
+    LLM --> A[Resposta Final CLI]
 ```
 
 ### Governança e Estratégia de Tokens
@@ -56,8 +63,9 @@ Antes de cada chamada ao LLM, o sistema garante eficiência de tokens através d
 ## Stack Tecnológico
 
 - **Linguagem**: Python 3.11+
-- **Banco de Dados**: PostgreSQL com `pgVector`
-- **Indexação**: Índice HNSW para busca de similaridade de cossenos
+- **Framework de IA**: LangChain (Mandatório)
+- **Banco de Dados**: PostgreSQL com extensão `pgVector`
+- **Modelos**: OpenAI ou Google Gemini (Embeddings e LLM)
 - **CLI**: Typer
 - **Validação**: Pydantic
 - **Testes**: Pytest

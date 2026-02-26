@@ -69,36 +69,61 @@
 - `semantic-rag ingest <file>` (or equivalent Typer command)
 - Verify rows in `documents` table with non-null embeddings
 
----
-
-## Phase 3 – Semantic Search & CLI
+## Phase 3 – LangChain Integration (Framework Transition)
 
 **Status:** `In Progress`
 
 ### Objectives
-- Implement retrieval pipeline
-- Enable user querying
+- Pivot custom infrastructure to LangChain ecosystem
+- Satisfy mandatory technical challenge requirement
 
 ### Key Tasks
-- Implement query embedding
-- Implement similarity_search logic
-- Implement CLI command: chat
-- Connect retrieval to basic RAG pipeline
+- Refactor `OpenAIEmbedding` to `langchain-openai` embeddings
+- Refactor `PgVectorStore` to utilize `langchain-postgres`
+- Implement LangChain PromptTemplates
+- Establish LangChain as the core orchestrator interface
 
 ### Deliverables
-- End-to-end retrieval working
-- Relevant chunks returned
+- Fully operational LangChain document ingestion
+- Re-architected infrastructure adapters
 
 ### Exit Criteria
-- User can query ingested documents successfully
+- System operates using LangChain mechanics natively without custom SQL vectors
 
 ### Validation Checkpoint
-- `semantic-rag chat`
-- Query returns retrieved chunks and final response without runtime errors
+- `semantic-rag ingest` successfully uses `langchain-postgres`
+- Pytest integration tests pass with LangChain mock objects
 
 ---
 
-## Phase 4 – Prompt Layer
+## Phase 4 – Semantic Search & CLI
+
+**Status:** `Not Started`
+
+### Objectives
+- Implement retrieval pipeline via LangChain
+- Enable user querying
+
+### Key Tasks
+- Implement Query embedding via LangChain
+- Implement VectorStore retrieval logic
+- Implement CLI command: chat
+- Connect retrieval to basic LangChain RAG pipeline
+
+### Deliverables
+- End-to-end retrieval working via CLI
+- Relevant chunks dynamically retrieved
+
+### Exit Criteria
+- User can query ingested documents via Terminal chat successfully
+
+### Validation Checkpoint
+- `semantic-rag chat`
+- Query returns LangChain retrieved chunks and final LLM response
+
+---
+
+## Phase 5 – Prompt Layer
 
 **Status:** `Not Started`
 
@@ -107,79 +132,72 @@
 - Structure prompts deterministically
 
 ### Key Tasks
-- Implement PromptBuilder
+- Configure robust LangChain `PromptTemplate`
 - Separate system and user prompts
 - Implement structured context formatting
-- Ensure provider-agnostic prompt structure
 
 ### Deliverables
-- Structured prompt object
 - Deterministic LLM invocation flow
 
 ### Exit Criteria
-- LLM receives well-structured and consistent prompts
+- LLM receives well-structured and consistent formatting
 
 ### Validation Checkpoint
-- Prompt object includes deterministic sections (`system`, `context`, `user`)
+- Inspect LangChain tracer / logs for consistent prompt formats
 - Same input produces same prompt structure
 
 ---
 
-## Phase 5 – Token Optimization Strategy Layer
+## Phase 6 – Token Optimization Strategy Layer
 
 **Status:** `Not Started`
 
 ### Objectives
 - Improve cost-efficiency
-- Optimize retrieval precision
+- Optimize retrieval precision before calling LLM
 
 ### Key Tasks
 - Implement dynamic top-k adjustment
 - Implement similarity threshold filtering
 - Implement context trimming
-- Implement conversation history window control
 
 ### Deliverables
-- TokenOptimizationStrategy component
+- TokenOptimizationStrategy Component
 - Measurable token reduction
 
 ### Exit Criteria
-- Reduced token usage without significant quality loss
+- Reduced token payload compared to naive RAG
 
 ### Validation Checkpoint
-- Compare baseline vs optimized token counts on same query set
-- Optimization does not drop all relevant chunks
+- Log pre-optimization and post-optimization token counts
 
 ---
 
-## Phase 6 – Token Budget Estimator
+## Phase 7 – Token Budget Estimator
 
 **Status:** `Not Started`
 
 ### Objectives
-- Prevent token overflow
-- Enforce safe LLM calls
+- Prevent Token Limit Overflow issues
+- Enforce strict adherence to Context Window Limits
 
 ### Key Tasks
-- Implement token counting mechanism
-- Reserve output tokens
-- Enforce maximum context size
-- Implement fallback reduction strategy
+- Reserve output tokens dynamically
+- Enforce maximum input token bounds
+- Implement fallback reduction strategy (truncation)
 
 ### Deliverables
-- TokenBudgetEstimator component
-- Safe LLM invocation wrapper
+- Safe LLM invocation wrapper over LangChain chain
 
 ### Exit Criteria
-- No token limit runtime errors
+- Application never crashes due to Context Window limits
 
 ### Validation Checkpoint
-- Calls near context limit execute safely
-- Overflow scenario triggers fallback reduction strategy
+- Provide a massive query and verify correct token rejection or reduction
 
 ---
 
-## Phase 7 – Professional Polish & Production Mindset
+## Phase 8 – Professional Polish & Production Mindset
 
 **Status:** `Not Started`
 
@@ -188,24 +206,17 @@
 
 ### Key Tasks
 - Add structured logging
-- Add metrics collection
-- Implement Economic and Deep execution modes
-- Increase pytest coverage (core prioritized)
-- Add benchmarking script
-- Improve README documentation
+- Increase test coverage
+- Final check of Clean Architecture boundaries
 
 ### Deliverables
-- Test coverage > 70% in core layer
-- Benchmark results documented
-- Clean and documented repository
+- Clean, documented, production-ready project
 
 ### Exit Criteria
-- Architecture consistent with ARCHITECTURE.md
-- Project ready for portfolio publication
+- Project ready for portfolio presentation
 
 ### Validation Checkpoint
-- Core-focused test coverage target reached
-- README and ADRs aligned with implemented structure (`cli/core/domain/infra`)
+- Typer CLI flows beautifully without generic exceptions
 
 ---
 

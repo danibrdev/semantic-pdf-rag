@@ -79,15 +79,15 @@ This layer coordinates the system but does not implement infrastructure.
 Subcomponents:
 
 #### Token Optimization Strategy Layer (Mandatory)
-- Dynamic top-k adjustment
-- Similarity threshold filtering
-- Context trimming
-- Conversation window control
+- Dynamic top-k adjustment via LangChain Retrievers
+- Similarity threshold filtering via `ContextualCompressionRetriever`
+- Context trimming via LangChain Document Compressors
+- Conversation window control via `ConversationTokenBufferMemory`
 
 #### Token Budget Estimator (Mandatory)
-- Pre-LLM token estimation
+- Pre-LLM token estimation via LangChain generic tokenizers (e.g. tiktoken integration)
 - Output token reservation
-- Context reduction when limits exceeded
+- Context reduction when limits exceeded natively via Memory constraints
 
 ---
 

@@ -7,13 +7,13 @@
 
 ## Strategies
 
-- Dynamic top-k retrieval
-- Similarity score threshold
+- Dynamic top-k retrieval (via LangChain Retrievers)
+- Similarity score threshold (via `ContextualCompressionRetriever`)
 - Context trimming based on token budget
-- Sliding window for conversation history
+- Sliding window for conversation history (via `ConversationTokenBufferMemory`)
 - Output token reservation
 
 ## Design Rule
 
-Every LLM call must pass through:
-Token Budget Estimator → Context Builder → Prompt Builder
+Every LLM call must pass through LangChain constructs incorporating:
+Contextual Compression → Token Buffer Memory → Prompt Template
