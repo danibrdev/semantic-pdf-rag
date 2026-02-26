@@ -163,7 +163,7 @@ Token Budget Estimator → Context Builder → Prompt Builder
 - Typer (CLI)
 - pytest
 - Docker
-- Optional: LangChain (abstraction layer)
+- LangChain (Core Orchestrator / Mandatory)
 
 ---
 
