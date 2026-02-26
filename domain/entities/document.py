@@ -1,0 +1,9 @@
+from pydantic import BaseModel
+from uuid import UUID, uuid4
+from typing import List
+
+class DocumentChunk(BaseModel):
+    id: UUID
+    document_name: str
+    content: str
+    embedding: List[float]
