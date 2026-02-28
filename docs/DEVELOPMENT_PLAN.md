@@ -76,8 +76,10 @@
 ### Objectives
 - Pivot custom infrastructure to LangChain ecosystem
 - Satisfy mandatory technical challenge requirement
+- Migrate text chunking to LangChain Text Splitters
 
 ### Key Tasks
+- Refactor custom `TextChunker` to LangChain `RecursiveCharacterTextSplitter` (1000/200)
 - Refactor `OpenAIEmbedding` to `langchain-openai` embeddings
 - Refactor `PgVectorStore` to utilize `langchain-postgres`
 - Implement LangChain PromptTemplates
@@ -86,6 +88,7 @@
 ### Deliverables
 - Fully operational LangChain document ingestion
 - Re-architected infrastructure adapters
+- Ingestion chunking standardized via LangChain splitter primitives
 
 ### Exit Criteria
 - System operates using LangChain mechanics natively without custom SQL vectors
@@ -103,16 +106,20 @@
 ### Objectives
 - Implement retrieval pipeline via LangChain
 - Enable user querying
+- Establish LCEL pipeline composition for query execution
 
 ### Key Tasks
 - Implement Query embedding via LangChain
 - Implement VectorStore retrieval logic
 - Implement CLI command: chat
 - Connect retrieval to basic LangChain RAG pipeline
+- Compose end-to-end chain using LCEL (`RunnableSequence` / pipe operator)
+- Add focused `RunnableLambda` steps for context shaping and output normalization
 
 ### Deliverables
 - End-to-end retrieval working via CLI
 - Relevant chunks dynamically retrieved
+- Composable query pipeline with clear runnable stages
 
 ### Exit Criteria
 - User can query ingested documents via Terminal chat successfully
@@ -130,14 +137,17 @@
 ### Objectives
 - Standardize LLM interaction
 - Structure prompts deterministically
+- Prepare prompt flow for optional summarization steps
 
 ### Key Tasks
 - Configure robust LangChain `PromptTemplate`
 - Separate system and user prompts
 - Implement structured context formatting
+- Add optional summarization prompt path for retrieved context compression
 
 ### Deliverables
 - Deterministic LLM invocation flow
+- Optional summarization capability for long-context scenarios
 
 ### Exit Criteria
 - LLM receives well-structured and consistent formatting
@@ -160,6 +170,9 @@
 - Implement dynamic top-k adjustment
 - Implement similarity threshold filtering
 - Implement context trimming
+- Implement optional map-reduce summarization for oversized retrieved context
+- Define summarization activation gate: trigger only when retrieved context tokens exceed `1.2x` effective budget
+- Preserve top-1/top-2 highest-similarity chunks in raw form alongside summaries
 
 ### Deliverables
 - TokenOptimizationStrategy Component
@@ -170,6 +183,7 @@
 
 ### Validation Checkpoint
 - Log pre-optimization and post-optimization token counts
+- Validate summarization gate behavior for below-threshold and above-threshold scenarios
 
 ---
 
@@ -185,6 +199,8 @@
 - Reserve output tokens dynamically
 - Enforce maximum input token bounds
 - Implement fallback reduction strategy (truncation)
+- Standardize budget formula: `budget = context_window - prompt_fixed - output_reserve(20%) - safety_margin(10%)`
+- Publish estimator output to pipeline gate for deterministic summarization decisions
 
 ### Deliverables
 - Safe LLM invocation wrapper over LangChain chain
@@ -194,6 +210,7 @@
 
 ### Validation Checkpoint
 - Provide a massive query and verify correct token rejection or reduction
+- Validate that summarization output targets `70–80%` of effective budget
 
 ---
 
@@ -217,6 +234,37 @@
 
 ### Validation Checkpoint
 - Typer CLI flows beautifully without generic exceptions
+
+---
+
+## Phase 9 – Security Hardening & Operational Resilience
+
+**Status:** `Not Started`
+
+### Objectives
+- Increase runtime safety for configuration, ingestion and persistence layers
+- Reduce operational/security risk before production exposure
+
+### Key Tasks
+- Add strict `Settings` guards (bounds for `top_k`, `similarity_threshold`, token reserves)
+- Remove import-time side effects in config (no global eager settings initialization)
+- Harden DB connectivity (`connect_timeout`, `statement_timeout`, SSL mode for non-local envs)
+- Add safe connection lifecycle handling (`close`, rollback on DB exceptions)
+- Add PDF ingestion guardrails (file existence, max size, max pages, graceful failure)
+- Pin dependency versions and add periodic vulnerability checks to CI
+- Add security-focused tests for invalid config and malicious/oversized input scenarios
+
+### Deliverables
+- Security baseline checklist implemented and validated
+- Hardened adapters for settings, PDF ingestion and vector store operations
+
+### Exit Criteria
+- Application fails safely on invalid config and dangerous/unsupported input
+- DB operations respect connection and statement safety limits
+
+### Validation Checkpoint
+- Run security-oriented test suite for config/database/ingestion boundaries
+- Run dependency audit (`pip-audit` or equivalent) with no critical unresolved issues
 
 ---
 

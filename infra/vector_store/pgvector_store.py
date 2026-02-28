@@ -1,6 +1,18 @@
+"""
+Adaptador de armazenamento vetorial usando PostgreSQL + pgVector.
 
+Implementação concreta de VectorStorePort que conecta ao PostgreSQL com a extensão pgVector.
+Responsável por:
+- Criar automaticamente a tabela `documents` e o índice HNSW na inicialização
+- Persistir chunks (texto + embedding) no banco
+- Buscar chunks por similaridade de cosseno usando o operador HNSW
 
-from typing import List
+O índice HNSW (Hierarchical Navigable Small World) oferece buscas de vizinhos
+mais próximos aproximados de forma muito eficiente, mesmo com grandes volumes de dados.
+
+"""
+
+from typing import List, Optional
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from domain.ports.vector_store_port import VectorStorePort
@@ -10,31 +22,33 @@ from infra.config.settings import Settings
 
 class PgVectorStore(VectorStorePort):
     """
-    PostgreSQL + pgVector implementation of VectorStorePort.
-    Responsible ONLY for persistence concerns.
+    Implementação do VectorStorePort usando PostgreSQL + pgVector.
+    Responsável APENAS por persistência — sem lógica de negócio.
     """
 
     def __init__(self, settings: Settings):
         self.settings = settings
+        # Abre a conexão com o banco usando a URL configurada no Settings
         self.conn = psycopg2.connect(settings.database_url)
+        # Registra o tipo `vector` do pgVector na conexão para operações com embeddings
         register_vector(self.conn)
+        # Garante que a tabela e o índice existem antes de qualquer operação
         self._ensure_table()
 
     def _ensure_table(self) -> None:
         """
-        Creates table if it does not exist.
-        Embedding dimension is dynamically defined by Settings.
-        Also ensures pgvector extension and HNSW index exist.
+        Cria a tabela `documents` e o índice HNSW se ainda não existirem.
+        A dimensão do vetor é definida dinamicamente pelo Settings.
         """
         with self.conn.cursor() as cur:
-            # Ensure pgvector extension exists
+            # Garante que a extensão pgVector está habilitada no banco
             cur.execute(
                 """
                 CREATE EXTENSION IF NOT EXISTS vector;
                 """
             )
 
-            # Create table
+            # Cria a tabela de documentos com coluna de embedding vetorial
             cur.execute(
                 f"""
                 CREATE TABLE IF NOT EXISTS documents (
@@ -47,7 +61,7 @@ class PgVectorStore(VectorStorePort):
                 """
             )
 
-            # Create HNSW index for cosine similarity
+            # Cria o índice HNSW para buscas por similaridade de cosseno de alta performance
             cur.execute(
                 """
                 CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx
@@ -60,7 +74,8 @@ class PgVectorStore(VectorStorePort):
 
     def save(self, chunk: DocumentChunk) -> None:
         """
-        Persists a document chunk.
+        Persiste um DocumentChunk no banco. Usa ON CONFLICT DO NOTHING para
+        evitar duplicatas caso o mesmo chunk seja inserido mais de uma vez.
         """
         import json
         with self.conn.cursor() as cur:
@@ -78,24 +93,41 @@ class PgVectorStore(VectorStorePort):
         self,
         embedding: List[float],
         k: int,
+        threshold: Optional[float] = None,
     ) -> List[DocumentChunk]:
         """
-        Returns the k most similar chunks as domain entities.
+        Busca os k chunks mais similares ao embedding fornecido usando distância coseno.
+        O operador `<->` do pgVector calcula a distância — ordem ascendente = mais similar primeiro.
+        Converte as linhas retornadas do banco em entidades de domínio (DocumentChunk).
         """
         with self.conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, document_name, content, embedding, metadata
-                FROM documents
-                ORDER BY embedding <-> %s::vector
-                LIMIT %s;
-                """,
-                (embedding, k),
-            )
+            if threshold is None:
+                cur.execute(
+                    """
+                    SELECT id, document_name, content, embedding, metadata
+                    FROM documents
+                    ORDER BY embedding <-> %s::vector
+                    LIMIT %s;
+                    """,
+                    (embedding, k),
+                )
+            else:
+                # Para cosine distance: similaridade mínima (0..1) vira distância máxima (1 - similarity).
+                max_distance = max(0.0, min(1.0, 1.0 - threshold))
+                cur.execute(
+                    """
+                    SELECT id, document_name, content, embedding, metadata
+                    FROM documents
+                    WHERE embedding <-> %s::vector <= %s
+                    ORDER BY embedding <-> %s::vector
+                    LIMIT %s;
+                    """,
+                    (embedding, max_distance, embedding, k),
+                )
 
             rows = cur.fetchall()
 
-        # Convert raw DB rows into domain entities
+        # Converte cada linha do banco em uma entidade de domínio DocumentChunk
         return [
             DocumentChunk(
                 id=row[0],

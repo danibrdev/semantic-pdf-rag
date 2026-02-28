@@ -5,7 +5,7 @@
 Semantic PDF RAG CLI is a production-grade, portfolio-level system designed to:
 
 - Ingest PDF documents
-- Perform semantic chunking (1000 size / 200 overlap)
+- Perform semantic chunking via LangChain Text Splitters (1000 size / 200 overlap)
 - Generate embeddings using a provider-agnostic interface
 - Store vectors in PostgreSQL with pgVector
 - Execute high-performance similarity search (HNSW index)
@@ -68,11 +68,14 @@ Examples:
 
 Responsibilities:
 - RAG orchestration
+- LCEL pipeline orchestration (`RunnableSequence` and composable runnables)
 - Token Optimization Strategy Layer
 - Token Budget Estimator
 - Context builder
 - Prompt builder
 - Dynamic retrieval logic (dynamic top-k, threshold filtering)
+- Data transformations via focused `RunnableLambda` stages
+- Optional summarization chain for long-context compression
 
 This layer coordinates the system but does not implement infrastructure.
 
@@ -96,6 +99,7 @@ Subcomponents:
 Responsibilities:
 - PostgreSQL + pgVector implementation
 - HNSW index configuration
+- Text chunking adapter via LangChain `RecursiveCharacterTextSplitter`
 - Embedding provider adapters (OpenAI / Gemini)
 - LLM provider adapters
 - PDF loader implementation
@@ -120,12 +124,26 @@ User Question
 → Apply similarity threshold
 → Apply token optimization
 → Estimate token budget
+→ Evaluate summarization gate (`retrieved_tokens > 1.2 * budget`)
+→ (Optional) Summarize retrieved context when gate is true (target `70–80%` of budget)
 → Build structured prompt
 → Call LLM
 → Return response
 
 All LLM calls must pass through:
-Token Budget Estimator → Context Builder → Prompt Builder
+Token Budget Estimator → LCEL Pipeline Stages (including `RunnableLambda` transforms) → Context Builder → Prompt Builder
+
+### Summarization Activation Policy (Future Implementation)
+
+- Summarization is conditional and cost-driven, not mandatory for every request
+- Effective budget formula:
+	- `budget = context_window - prompt_fixed - output_reserve(20%) - safety_margin(10%)`
+- Activation rule:
+	- run summarization only when `retrieved_tokens > 1.2 * budget`
+- Summarization target:
+	- compress retrieved context to approximately `70–80%` of `budget`
+- Fidelity safeguard:
+	- preserve top-1/top-2 highest-similarity chunks in raw form alongside summarized context
 
 ---
 
@@ -134,6 +152,7 @@ Token Budget Estimator → Context Builder → Prompt Builder
 - Ports & Adapters (Hexagonal)
 - Repository Pattern (Vector storage)
 - Strategy Pattern (Token Optimization)
+- Pipeline Pattern via LangChain LCEL
 - Factory Pattern (Provider selection)
 - Dependency Injection via constructor
 - Provider-Agnostic abstraction
@@ -150,6 +169,19 @@ Token Budget Estimator → Context Builder → Prompt Builder
 - Structured logging (no print statements)
 - High cohesion and low coupling
 - Small, single-responsibility classes
+- Secure-by-default configuration and secret handling
+- Defensive input handling for ingestion boundaries (file size/page limits)
+- Operational resilience with explicit timeouts and fail-safe behavior
+
+### 6.1 Security & Resilience Baseline
+
+- Configuration validation is mandatory at startup (bounds and invariants)
+- Secrets must be loaded only from environment/settings abstractions
+- Database adapters must enforce connection and statement timeouts
+- Production-like environments must require encrypted DB transport (SSL/TLS)
+- Ingestion adapters must reject unsupported or oversized payloads safely
+- Error handling must preserve diagnostics without exposing credentials/secrets
+- Dependency supply chain must be monitored through periodic vulnerability scans
 
 ---
 

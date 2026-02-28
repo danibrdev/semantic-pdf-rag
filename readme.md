@@ -17,6 +17,7 @@ O projeto foi criado para cumprir o seguinte requisito técnico:
 
 - **Arquitetura Limpa & Ports/Adapters**: Lógica de domínio (Core) isolada da infraestrutura.
 - **Integração com LangChain**: Utilização profunda do ecossistema LangChain para orquestração de RAG, modelos de embeddings e comunicação com LLMs.
+- **Chunking com LangChain**: Estratégia de divisão de texto padronizada via Text Splitters (ex.: `RecursiveCharacterTextSplitter`) mantendo configuração 1000/200.
 - **Governança Explícita de Tokens**: Inclui uma Camada de Estratégia de Otimização de Tokens para aplicar controle de orçamento de contexto.
 - **Focado em CLI**: Projetado para processamento de alta velocidade baseado no terminal.
 - **Pronto para Produção**: Testável, extensível, e estruturado com tipagem (Type Hints) e logs claros.
@@ -64,6 +65,7 @@ Antes de cada chamada ao LLM, o sistema garante eficiência de tokens através d
 
 - **Linguagem**: Python 3.11+
 - **Framework de IA**: LangChain (Mandatório)
+- **Chunking**: LangChain Text Splitters (`RecursiveCharacterTextSplitter`)
 - **Banco de Dados**: PostgreSQL com extensão `pgVector`
 - **Modelos**: OpenAI ou Google Gemini (Embeddings e LLM)
 - **CLI**: Typer

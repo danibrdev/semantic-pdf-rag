@@ -1,4 +1,14 @@
-# Implementação de factory para criação de embeddings. Lê as configurações do arquivo .env e cria a implementação concreta de acordo com o provider selecionado
+"""
+Composition Root — Factory de dependências da aplicação.
+
+Este módulo é o único lugar do sistema onde implementações concretas são instanciadas.
+Decide em runtime qual provedor usar (OpenAI ou Gemini) e cria todas as dependências
+necessárias para o funcionamento do sistema, entregando-as via dicionário.
+
+Seguindo o princípio da Clean Architecture, o restante do sistema (core, cli)
+nunca instancia dependências diretamente — recebe-as prontas deste factory.
+"""
+
 from infra.config.settings import Settings
 from infra.embeddings.openai_embedding import OpenAIEmbedding
 from infra.embeddings.gemini_embedding import GeminiEmbedding
@@ -6,36 +16,10 @@ from infra.loaders.pdf_loader import PDFLoader
 from infra.vector_store.pgvector_store import PgVectorStore
 
 
-def get_embedding_provider():
-
-    if Settings.provider == "openai":
-        if not Settings.openai_api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
-
-        return OpenAIEmbedding(
-            api_key=Settings.openai_api_key,
-            model=Settings.openai_embedding_model
-        )
-
-    if Settings.provider == "gemini":
-        if not Settings.google_api_key:
-            raise ValueError("GOOGLE_API_KEY not configured")
-
-        return GeminiEmbedding(
-            api_key=Settings.google_api_key,
-            model=Settings.gemini_embedding_model
-        )
-
-    raise ValueError("Invalid provider")
-
-# Composition Root / Dependency Builder
-# Responsible for instantiating concrete implementations
-# based on validated Settings
-
 def build_embedding_provider(settings: Settings):
     """
-    Builds the embedding provider based on the configured provider.
-    Assumes Settings validation has already been executed.
+    Cria e retorna o provedor de embeddings correto com base no `provider` configurado no .env.
+    Suporta: "openai" → OpenAIEmbedding | "gemini" → GeminiEmbedding.
     """
 
     model = settings.current_embedding_model
@@ -57,8 +41,8 @@ def build_embedding_provider(settings: Settings):
 
 def build_dependencies(settings: Settings):
     """
-    Centralized dependency builder.
-    Future-proof for adding LLM, VectorStore, TokenOptimizer, etc.
+    Monta e retorna todas as dependências concretas da aplicação em um dicionário.
+    Ponto central de injeção de dependências (Dependency Injection Manual).
     """
 
     embedding = build_embedding_provider(settings)
