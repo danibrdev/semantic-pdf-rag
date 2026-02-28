@@ -118,3 +118,23 @@ def test_pgvector_store_similarity_search(mock_register_vector, mock_psycopg2):
     assert results[1].content == "Result 2"
     assert results[1].embedding == [0.4, 0.5, 0.6]
     assert results[1].metadata == {"author": "Steve"}
+
+
+@patch("infra.vector_store.pgvector_store.psycopg2")
+@patch("infra.vector_store.pgvector_store.register_vector")
+def test_pgvector_store_similarity_search_with_threshold(mock_register_vector, mock_psycopg2):
+    mock_conn = MagicMock()
+    mock_psycopg2.connect.return_value = mock_conn
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = []
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+
+    settings = MockSettings()
+    store = PgVectorStore(settings)
+
+    search_embedding = [0.1, 0.2, 0.3]
+    results = store.similarity_search(embedding=search_embedding, k=2, threshold=0.8)
+
+    assert results == []
+    mock_cursor.execute.assert_called()
