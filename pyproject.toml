@@ -10,6 +10,7 @@ readme = "readme.md"
 requires-python = ">=3.9"
 dependencies = [
   "langchain",
+  "langchain-postgres",
   "langchain-openai",
   "langchain-google-genai",
   "openai",

@@ -12,27 +12,39 @@ Exemplo com chunk_size=1000 e overlap=200:
 """
 
 from typing import List
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 
 class TextChunker:
 
-    def __init__(self, chunk_size=1000, overlap=200):
+    def __init__(self, chunk_size: int = 1000, overlap: int = 200):
         # Número de caracteres por chunk (não tokens)
         self.chunk_size = chunk_size
         # Número de caracteres que se repetem entre chunks consecutivos para preservar contexto
         self.overlap = overlap
 
+        # Usa o splitter oficial do LangChain para padronizar o chunking
+        self._splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.overlap,
+            separators=["\n\n", "\n", " ", ""],  # Quebra hierárquica (parágrafo -> linha -> palavra)
+        )
+
     def chunk(self, text: str) -> List[str]:
         """
-        Divide o texto em uma lista de chunks com tamanho e sobreposição configurados.
-        Retorna lista vazia se o texto estiver vazio.
+        Divide o texto em chunks usando o splitter do LangChain.
+        :param text: O texto completo a ser dividido.
+        :return: Lista de chunks resultantes.
         """
-        chunks = []
-        start = 0
 
-        while start < len(text):
-            end = start + self.chunk_size
-            chunks.append(text[start:end])
-            # Avança pela diferença entre chunk_size e overlap para criar a janela deslizante
-            start += self.chunk_size - self.overlap
+        # Proteção contra texto vazio/nulo
+        if not text or not text.strip():
+            return []
 
-        return chunks
+        # Gera os chunks via LangChain
+        chunks = self._splitter.split_text(text)
+
+        # Remove blocos vazios do inicio e do fim da string por segurança
+        # Isso é importante porque o processo de chunking pode, em alguns casos, gerar chunks vazios, especialmente se o texto tiver muitas quebras de linha ou espaços. 
+        # Ao usar essa expressão, garantimos que a lista final de chunks contenha apenas pedaços de texto significativos.
+        return [chunk for chunk in chunks if chunk.strip()]

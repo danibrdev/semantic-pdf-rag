@@ -1,12 +1,9 @@
 """
 Composition Root — Factory de dependências da aplicação.
 
-Este módulo é o único lugar do sistema onde implementações concretas são instanciadas.
-Decide em runtime qual provedor usar (OpenAI ou Gemini) e cria todas as dependências
-necessárias para o funcionamento do sistema, entregando-as via dicionário.
-
-Seguindo o princípio da Clean Architecture, o restante do sistema (core, cli)
-nunca instancia dependências diretamente — recebe-as prontas deste factory.
+Este módulo é o único lugar do sistema onde as implementações concretas são instanciadas.
+Decide em tempo de execução qual provedor usar (OpenAI ou Gemini) e cria todas
+as dependências necessárias, entregando-as como um dicionário para o restante do sistema.
 """
 
 from infra.config.settings import Settings
@@ -18,10 +15,10 @@ from infra.vector_store.pgvector_store import PgVectorStore
 
 def build_embedding_provider(settings: Settings):
     """
-    Cria e retorna o provedor de embeddings correto com base no `provider` configurado no .env.
-    Suporta: "openai" → OpenAIEmbedding | "gemini" → GeminiEmbedding.
+    Cria e retorna o provedor de embeddings correto com base no campo `provider` do .env.
+    Suporta "openai" e "gemini".
     """
-
+    # current_embedding_model é uma @property do Settings que retorna o modelo do provedor ativo
     model = settings.current_embedding_model
 
     if settings.provider == "openai":
@@ -36,15 +33,16 @@ def build_embedding_provider(settings: Settings):
             model=model,
         )
 
+    # Se o provider configurado não for reconhecido, o sistema falha imediatamente
+    # com uma mensagem clara identificando o valor inválido
     raise ValueError(f"Unsupported provider: {settings.provider}")
 
 
-def build_dependencies(settings: Settings):
+def build_dependencies(settings: Settings) -> dict:
     """
-    Monta e retorna todas as dependências concretas da aplicação em um dicionário.
-    Ponto central de injeção de dependências (Dependency Injection Manual).
+    Cria todas as dependências concretas da aplicação e as retorna em um dicionário.
+    O dicionário funciona como um container de dependências para a CLI e os casos de uso.
     """
-
     embedding = build_embedding_provider(settings)
     pdf_loader = PDFLoader()
     vector_store = PgVectorStore(settings)

@@ -1,93 +1,80 @@
 """
-Adaptador de armazenamento vetorial usando PostgreSQL + pgVector.
+Adaptador de armazenamento vetorial usando `langchain-postgres`.
 
-Implementação concreta de VectorStorePort que conecta ao PostgreSQL com a extensão pgVector.
-Responsável por:
-- Criar automaticamente a tabela `documents` e o índice HNSW na inicialização
-- Persistir chunks (texto + embedding) no banco
-- Buscar chunks por similaridade de cosseno usando o operador HNSW
-
-O índice HNSW (Hierarchical Navigable Small World) oferece buscas de vizinhos
-mais próximos aproximados de forma muito eficiente, mesmo com grandes volumes de dados.
-
+Implementa o `VectorStorePort` delegando persistência e busca vetorial para o `PGVector`,
+evitando SQL manual e mantendo a integração dentro do ecossistema LangChain.
 """
 
-from typing import List, Optional
-import psycopg2
-from pgvector.psycopg2 import register_vector
-from domain.ports.vector_store_port import VectorStorePort
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID
+
+# Document representa um trecho de texto com metadados no LangChain
+from langchain_core.documents import Document
+# Embeddings é a interface base do LangChain para qualquer provedor de vetorização
+from langchain_core.embeddings import Embeddings
+# PGVector é a integração do LangChain com o PostgreSQL usando a extensão pgvector
+from langchain_postgres import PGVector
+
 from domain.entities.document import DocumentChunk
+from domain.ports.vector_store_port import VectorStorePort
 from infra.config.settings import Settings
 
 
+class _NoopEmbeddings(Embeddings):
+    """
+    Implementação mínima de Embeddings exigida pela interface do PGVector.
+
+    O PGVector do LangChain exige um objeto `Embeddings` no construtor, mas neste projeto
+    os vetores já chegam calculados pelo EmbeddingPort antes de chegar ao store.
+    As operações de escrita e busca usam vetores explícitos (`add_embeddings` e
+    `similarity_search_by_vector`), então este objeto nunca é chamado de fato.
+
+    O prefixo `_` indica que esta classe é interna ao módulo e não deve ser usada de fora.
+    """
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        raise NotImplementedError("Use add_embeddings com vetores já calculados.")
+
+    def embed_query(self, text: str) -> List[float]:
+        raise NotImplementedError("Use similarity_search com vetor já calculado.")
+
+
 class PgVectorStore(VectorStorePort):
-    """
-    Implementação do VectorStorePort usando PostgreSQL + pgVector.
-    Responsável APENAS por persistência — sem lógica de negócio.
-    """
+    """Implementação de store vetorial baseada em `PGVector` do LangChain."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        # Abre a conexão com o banco usando a URL configurada no Settings
-        self.conn = psycopg2.connect(settings.database_url)
-        # Registra o tipo `vector` do pgVector na conexão para operações com embeddings
-        register_vector(self.conn)
-        # Garante que a tabela e o índice existem antes de qualquer operação
-        self._ensure_table()
+        # Nome da coleção (tabela) onde os chunks serão armazenados no banco
+        self.collection_name = "documents"
 
-    def _ensure_table(self) -> None:
-        """
-        Cria a tabela `documents` e o índice HNSW se ainda não existirem.
-        A dimensão do vetor é definida dinamicamente pelo Settings.
-        """
-        with self.conn.cursor() as cur:
-            # Garante que a extensão pgVector está habilitada no banco
-            cur.execute(
-                """
-                CREATE EXTENSION IF NOT EXISTS vector;
-                """
-            )
-
-            # Cria a tabela de documentos com coluna de embedding vetorial
-            cur.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS documents (
-                    id UUID PRIMARY KEY,
-                    document_name TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    embedding vector({self.settings.embedding_dimension}),
-                    metadata JSONB DEFAULT '{{}}'::jsonb
-                );
-                """
-            )
-
-            # Cria o índice HNSW para buscas por similaridade de cosseno de alta performance
-            cur.execute(
-                """
-                CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx
-                ON documents
-                USING hnsw (embedding vector_cosine_ops);
-                """
-            )
-
-            self.conn.commit()
+        # Inicializa o PGVector com a string de conexão e o nome da coleção.
+        # use_jsonb=True armazena os metadados como JSONB no PostgreSQL,
+        # o que permite buscas eficientes dentro dos campos de metadados.
+        self.store = PGVector(
+            embeddings=_NoopEmbeddings(),
+            connection=settings.database_url,
+            collection_name=self.collection_name,
+            use_jsonb=True,
+        )
 
     def save(self, chunk: DocumentChunk) -> None:
-        """
-        Persiste um DocumentChunk no banco. Usa ON CONFLICT DO NOTHING para
-        evitar duplicatas caso o mesmo chunk seja inserido mais de uma vez.
-        """
-        import json
-        with self.conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO documents (id, document_name, content, embedding, metadata)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (id) DO NOTHING;
-                """,
-                (str(chunk.id), chunk.document_name, chunk.content, chunk.embedding, json.dumps(chunk.metadata)),
-            )
-            self.conn.commit()
+        """Persiste um chunk (texto + embedding) no banco vetorial."""
+
+        # Cria uma cópia dos metadados para não modificar o objeto original
+        metadata: Dict[str, Any] = dict(chunk.metadata)
+
+        # Adiciona campos de identificação nos metadados para recuperação posterior
+        metadata["id"] = str(chunk.id)
+        metadata["document_name"] = chunk.document_name
+        metadata["_embedding"] = chunk.embedding  # Armazena o vetor para reconstruir o chunk na leitura
+
+        # add_embeddings recebe vetores já calculados (não chama o _NoopEmbeddings)
+        self.store.add_embeddings(
+            texts=[chunk.content],
+            embeddings=[chunk.embedding],
+            metadatas=[metadata],
+            ids=[str(chunk.id)],
+        )
 
     def similarity_search(
         self,
@@ -96,45 +83,54 @@ class PgVectorStore(VectorStorePort):
         threshold: Optional[float] = None,
     ) -> List[DocumentChunk]:
         """
-        Busca os k chunks mais similares ao embedding fornecido usando distância coseno.
-        O operador `<->` do pgVector calcula a distância — ordem ascendente = mais similar primeiro.
-        Converte as linhas retornadas do banco em entidades de domínio (DocumentChunk).
+        Busca os k chunks mais similares ao vetor fornecido e os retorna como entidades de domínio.
+        Se threshold for informado, descarta resultados com similaridade abaixo do valor mínimo.
         """
-        with self.conn.cursor() as cur:
-            if threshold is None:
-                cur.execute(
-                    """
-                    SELECT id, document_name, content, embedding, metadata
-                    FROM documents
-                    ORDER BY embedding <-> %s::vector
-                    LIMIT %s;
-                    """,
-                    (embedding, k),
-                )
-            else:
-                # Para cosine distance: similaridade mínima (0..1) vira distância máxima (1 - similarity).
-                max_distance = max(0.0, min(1.0, 1.0 - threshold))
-                cur.execute(
-                    """
-                    SELECT id, document_name, content, embedding, metadata
-                    FROM documents
-                    WHERE embedding <-> %s::vector <= %s
-                    ORDER BY embedding <-> %s::vector
-                    LIMIT %s;
-                    """,
-                    (embedding, max_distance, embedding, k),
-                )
+        docs_with_scores: List[Tuple[Document, float]] = []
 
-            rows = cur.fetchall()
-
-        # Converte cada linha do banco em uma entidade de domínio DocumentChunk
-        return [
-            DocumentChunk(
-                id=row[0],
-                document_name=row[1],
-                content=row[2],
-                embedding=row[3],
-                metadata=row[4] if row[4] else {}
+        # Algumas versões do langchain-postgres possuem o método com score, outras não.
+        # Verificamos se ele existe antes de chamar para garantir compatibilidade.
+        if hasattr(self.store, "similarity_search_with_score_by_vector"):
+            docs_with_scores = self.store.similarity_search_with_score_by_vector(
+                embedding=embedding,
+                k=k,
             )
-            for row in rows
-        ]
+        else:
+            # Fallback para versões sem suporte a score: atribui 0.0 como distância
+            docs = self.store.similarity_search_by_vector(
+                embedding=embedding,
+                k=k,
+            )
+            docs_with_scores = [(doc, 0.0) for doc in docs]
+
+        results: List[DocumentChunk] = []
+        for doc, distance_score in docs_with_scores:
+            # O PGVector retorna distância (0 = idêntico). Convertemos para similaridade (1 = idêntico):
+            # similaridade = 1 - distância. max/min garantem o resultado entre 0.0 e 1.0.
+            similarity_score = max(0.0, min(1.0, 1.0 - float(distance_score)))
+
+            # Descarta o chunk se a similaridade for menor que o limiar configurado
+            if threshold is not None and similarity_score < threshold:
+                continue
+
+            # Separa os campos internos dos metadados para montar o DocumentChunk
+            metadata = dict(doc.metadata or {})
+            chunk_id = metadata.pop("id", None)                     # Remove e captura o id
+            document_name = metadata.pop("document_name", "unknown")  # Remove e captura o nome
+            stored_embedding = metadata.pop("_embedding", [])        # Remove e captura o embedding
+
+            # Chunk sem id não pode ser reconstruído — pula para o próximo
+            if chunk_id is None:
+                continue
+
+            results.append(
+                DocumentChunk(
+                    id=UUID(str(chunk_id)),             # Converte string de volta para UUID
+                    document_name=str(document_name),
+                    content=doc.page_content,           # Texto principal do documento LangChain
+                    embedding=stored_embedding,
+                    metadata=metadata,                  # Metadados restantes (sem os campos internos)
+                )
+            )
+
+        return results

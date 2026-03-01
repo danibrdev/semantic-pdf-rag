@@ -1,6 +1,7 @@
 # Coding Standards
 
 - Type hints mandatory (public APIs, ports, adapters, use cases)
+- All method/function parameters **and** return types must be explicitly annotated — no bare `def f(x):` allowed in production code
 - Pydantic models for DTOs and settings validation
 - Small, single-responsibility classes
 - No business logic inside infrastructure
@@ -56,6 +57,8 @@
 ## Functions
 - Small and focused
 - Max 30 lines recommended
+- **Every parameter must declare its type**: use Python type annotations for all parameters and the return type (e.g., `def process(doc: Document, limit: int) -> list[Chunk]:`)
+- Use `Optional[T]` (or `T | None`) for nullable parameters instead of leaving the type implicit
 - Public functions should have precise docstrings when behavior is non-trivial
 - Avoid boolean-flag overloads; prefer small composable functions
 
@@ -122,6 +125,32 @@
 - When architecture changes, update at least: `ARCHITECTURE`, `DEVELOPMENT_PLAN`, `RAG_FLOW`
 - Document formulas/thresholds used for token or summarization gates
 - Avoid stale examples in README and CLI docs
+
+## Didactic Comments (Case Study Standard)
+
+Because this codebase serves as an educational case study for readers who may be new to Python,
+comments must teach — not just label. Every non-trivial block of code should be understandable
+to someone reading it for the first time.
+
+- **All comments must be written in Brazilian Portuguese (PT-BR)** — this keeps the material accessible to the primary audience of the case study
+
+### O que comentar
+
+- **Explique o *porquê*, não o *o quê***: assuma que o leitor consegue ler o código; explique a razão por trás das decisões não óbvias
+  - ❌ `# itera sobre os chunks` — apenas repete o código
+  - ✅ `# cada chunk é processado separadamente para respeitar o limite de tokens por chamada ao LLM`
+- **Explique construções Python que podem ser desconhecidas**: decorators, list comprehensions, context managers, generators, dataclasses, etc.
+  - Ex.: `# @dataclass gera automaticamente __init__, __repr__ e __eq__ com base nos campos declarados`
+- **Justifique a escolha de bibliotecas externas**: ao usar LangChain, Pydantic, psycopg2, etc., explique brevemente o papel da biblioteca naquele ponto
+  - Ex.: `# Pydantic valida e coerce os dados de configuração em tempo de execução, evitando erros silenciosos`
+- **Anote escolhas arquiteturais inline**: ao introduzir um padrão (ex.: porta/adaptador, pipe LCEL), explique *por que* aquele padrão foi escolhido
+- **Marque as fronteiras da Clean Architecture**: use comentários como `# Regra de domínio — nenhuma dependência de infraestrutura permitida aqui`
+- **Documente fórmulas e limiares não triviais**: explique a lógica por trás de limites de tokens, thresholds de similaridade ou parâmetros de chunking
+- **Use os prefixos `# NOTA:` e `# POR QUÊ:`** para decisões importantes ou contra-intuitivas
+
+### O que não comentar
+
+- **Evite comentários redundantes** em código autoexplicativo — comente apenas quando acrescenta entendimento além do que o código já expressa claramente
 
 ## Git & Version Control
 - All commits MUST follow the [Semantic Commits](https://www.conventionalcommits.org/) convention.
